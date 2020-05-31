@@ -25,6 +25,8 @@ private:
     void OnTouchMotion(const SDL_TouchFingerEvent& event);
     void OnTouchDown(const SDL_TouchFingerEvent& event);
     void OnTouchUp(const SDL_TouchFingerEvent& event);
+    void OnButtonDown(const SDL_JoyButtonEvent& event);
+    void OnButtonUp(const SDL_JoyButtonEvent& event);
 
     SDL_Window* window;
     SDL_Renderer* renderer;
@@ -154,21 +156,14 @@ bool Game::Input()
                     event.jaxis.axis, event.jaxis.value);
             break;
         case SDL_JOYBUTTONDOWN:
-            SDL_Log("Joystick %d button %d down\n",
-                    event.jbutton.which, event.jbutton.button);
             // https://github.com/devkitPro/SDL/blob/switch-sdl2/src/joystick/switch/SDL_sysjoystick.c#L52
             // seek for joystick #0
             if (event.jbutton.which == 0)
             {
-                if (event.jbutton.button == 0)
-                {
-                    // (A) button down
-                }
-                else if (event.jbutton.button == 10)
-                {
-                    // (+) button down
+                OnButtonDown(event.jbutton);
+
+                if (event.jbutton.button == KEY_PLUS)
                     return false;
-                }
             }
             break;
 
@@ -196,7 +191,7 @@ void Game::OnTouchDown(const SDL_TouchFingerEvent& event)
         return;
     }
 
-    uint32_t matches = puzzle->match(tile_x, tile_y);
+    uint32_t matches = puzzle->match(tile_x, tile_y) - 1;
     score += matches * matches;
 
     points.clear();
@@ -226,11 +221,23 @@ void Game::OnTouchMotion(const SDL_TouchFingerEvent& event)
         if (current_color != Puzzle::EMPTY)
         {
             auto [r, g, b] = colors[current_color];
-            modulation.set(RGBA8_MAXALPHA(std::max(0, r - 48), std::max(0, g - 48), std::max(0, b - 48)),
+            modulation.set(RGBA8_MAXALPHA(std::max(0,   r - 48), std::max(0,   g - 48), std::max(0,   b - 48)),
                            RGBA8_MAXALPHA(std::min(255, r + 48), std::min(255, g + 48), std::min(255, b + 48)), 60);
         }
     }
 }
+
+void Game::OnButtonDown(const SDL_JoyButtonEvent& event)
+{
+    if (event.button == KEY_MINUS)
+        New();
+}
+
+void Game::OnButtonUp(const SDL_JoyButtonEvent& event)
+{
+
+}
+
 
 void Game::Draw()
 {

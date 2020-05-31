@@ -48,10 +48,10 @@ OUTPUT		:=	output
 ROMFS		:=	romfs
 
 SWITCH_IP	:= "192.168.1.75"
-APP_TITLE	:= "???????"
-APP_AUTHOR	:= "no-name"
-APP_VERSION	:= "0.1"
-# APP_TITLEID := "title"
+APP_TITLE	:= Switch Shot!
+APP_AUTHOR	:= TricksterGuy
+APP_VERSION	:= 0.1
+APP_TITLEID := E3BA0DD29CA7E000
 
 #---------------------------------------------------------------------------------
 # options for code generation

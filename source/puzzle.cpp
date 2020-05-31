@@ -8,8 +8,9 @@
 uint32_t Puzzle::match(uint32_t x, uint32_t y)
 {
     auto matched = test(x, y);
+
     if (matched.size() <= 1)
-        return 0;
+        return 1;
 
     for (const auto [x, y] : matched)
         data[y * width + x] = EMPTY;
@@ -36,29 +37,24 @@ Puzzle::point_set Puzzle::test(uint32_t x, uint32_t y) const
     {
         auto [x, y] = queue.front();
         queue.pop_front();
-        //printf("search: %d %d\n", x, y);
 
         if (visited.find({x - 1, y}) == visited.end() && x >= 1         && data[y * width + x - 1] == color)
         {
-            //printf("add: %d %d\n", x - 1, y);
             queue.push_back({x - 1, y});
             visited.insert({x - 1, y});
         }
         if (visited.find({x + 1, y}) == visited.end() && x + 1 < width  && data[y * width + x + 1] == color)
         {
-            //printf("add: %d %d\n", x + 1, y);
             queue.push_back({x + 1, y});
             visited.insert({x + 1, y});
         }
         if (visited.find({x, y - 1}) == visited.end() && y >= 1         && data[(y - 1) * width + x] == color)
         {
-            //printf("add: %d %d\n", x, y - 1);
             queue.push_back({x, y - 1});
             visited.insert({x, y - 1});
         }
         if (visited.find({x, y + 1}) == visited.end() && y + 1 < height && data[(y + 1) * width + x] == color)
         {
-            //printf("add: %d %d\n", x, y + 1);
             queue.push_back({x, y + 1});
             visited.insert({x, y + 1});
         }
@@ -80,12 +76,10 @@ void Puzzle::compact(const point_set& hints)
         maxx = std::max(x, maxx);
         maxy = std::max(y, maxy);
     }
-    //printf("%d %d %d %d\n", minx, miny, maxx, maxy);
 
     int32_t x_mark = -1;
-    for (int32_t x = minx; x <= maxx; x++)
+    for (uint32_t x = minx; x <= maxx; x++)
     {
-        //printf("%d %d\n", x, x_mark);
         int32_t y_mark = -1;
         bool moved_one = false;
         for (int32_t y = maxy; y >= 0 ; y--)
@@ -96,7 +90,6 @@ void Puzzle::compact(const point_set& hints)
             {
                 int32_t movex = x_mark == -1 ? x : x_mark;
                 int32_t movey = y_mark == -1 ? y : y_mark;
-                //printf("%d %d <- %d %d\n", movex, movey, x, y);
                 std::swap(data[movey * width + movex], data[y * width + x]);
                 if (y_mark != -1) y_mark--;
                 moved_one = true;
@@ -104,7 +97,6 @@ void Puzzle::compact(const point_set& hints)
         }
         if (x_mark == -1 && maxy == height - 1 && data[(height - 1) * width + x] == EMPTY)
         {
-            //printf("xmark\n");
             x_mark = x;
             maxx = width - 1;
         }
