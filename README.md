@@ -10,10 +10,11 @@ Maybe I'll get ambitious and toss in some more features, and UI considering the 
 * Difficulty settings. (Ensuring every game has a solution).
 * Configurable color palettes.
 * Graphics for tiles instead of single colors.
+* Undo support.
 * High score boards (Global) / Daily challenges.
 
 ## Screenshots
-![Title](screenshots/screen1.jpg)
+![Title](screenshots/screen1.png)
 
 ## Controls
 * Up/Down/Left/Right (Joystick or D-Pad) moves the cursor.
@@ -33,6 +34,9 @@ Maybe I'll get ambitious and toss in some more features, and UI considering the 
 
 ## Credits
 Cursor graphic is mine (Willing to accept pull requests for better ones).
+App Icon is also mine (Also willing to accept pull requests for better ones).
+
+GIMP for version 2.10.2 of GIMP because apparently 2.10.16 and 2.10.18 is super broken.
 
 devkitpro team and SDL2 (and friends) team.
 
