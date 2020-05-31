@@ -12,13 +12,21 @@
 #include "puzzle.hpp"
 #include "color_modulation.hpp"
 
-
 constexpr uint32_t SCREEN_WIDTH = 1920;
 constexpr uint32_t SCREEN_HEIGHT = 1080;
 
 constexpr uint32_t GAME_WIDTH = SCREEN_WIDTH;
 constexpr uint32_t GAME_HEIGHT = SCREEN_HEIGHT - 120;
 
+inline int randomInt(int max)
+{
+    return rand() / (RAND_MAX / max + 1);
+}
+
+inline int randomInt(int start, int end)
+{
+    return randomInt(end - start + 1) + start;
+}
 
 enum SDLKeyMapping {
         SDL_KEY_A, SDL_KEY_B, SDL_KEY_X, SDL_KEY_Y,
@@ -40,36 +48,37 @@ enum InputMode
 
 class Game
 {
-public:
-    bool Initialize();
-    void New();
-    void Run();
-    bool Update();
-    bool Input();
-    void Draw();
-    void Destroy();
-private:
-    void OnTouchMotion(const SDL_TouchFingerEvent& event);
-    void OnTouchDown(const SDL_TouchFingerEvent& event);
-    void OnTouchUp(const SDL_TouchFingerEvent& event);
-    void OnButtonDown(const SDL_JoyButtonEvent& event);
-    void OnButtonUp(const SDL_JoyButtonEvent& event);
+    public:
+        bool Initialize();
+        void New(time_t seeded_game = 0);
+        void Run();
+        bool Update();
+        bool Input();
+        void Draw();
+        void Destroy();
+    private:
+        void OnTouchMotion(const SDL_TouchFingerEvent& event);
+        void OnTouchDown(const SDL_TouchFingerEvent& event);
+        void OnTouchUp(const SDL_TouchFingerEvent& event);
+        void OnButtonDown(const SDL_JoyButtonEvent& event);
+        void OnButtonUp(const SDL_JoyButtonEvent& event);
 
-    std::pair<uint32_t, uint32_t> GetCoords(float x, float y) const;
-    void DoMatch(uint32_t tile_x, uint32_t tile_y);
-    void DoSelectSet(uint32_t tile_x, uint32_t tile_y);
+        std::pair<uint32_t, uint32_t> GetCoords(float x, float y) const;
+        void DoMatch(uint32_t tile_x, uint32_t tile_y);
+        void DoSelectSet(uint32_t tile_x, uint32_t tile_y);
 
-    SDL_Window* window;
-    SDL_Renderer* renderer;
-    SDL_Texture* cursor;
-    std::unique_ptr<NFont> font;
-    std::unique_ptr<Puzzle> puzzle;
-    uint32_t score;
-    std::vector<std::tuple<uint8_t, uint8_t, uint8_t>> colors;
-    std::pair<uint32_t, uint32_t> current_tile;
-    Puzzle::point_set points;
-    ColorModulation modulation;
-    int input_mode = TOUCH;
+        SDL_Window* window = nullptr;
+        SDL_Renderer* renderer = nullptr;
+        SDL_Texture* cursor = nullptr;
+        std::unique_ptr<NFont> font;
+        std::unique_ptr<Puzzle> puzzle;
+        uint32_t score;
+        std::vector<std::tuple<uint8_t, uint8_t, uint8_t>> colors;
+        std::pair<uint32_t, uint32_t> current_tile;
+        Puzzle::point_set points;
+        ColorModulation modulation;
+        int input_mode = TOUCH;
+        time_t seed;
 };
 
 bool Game::Initialize()
@@ -86,7 +95,6 @@ bool Game::Initialize()
     if (!window)
     {
         SDL_Log("SDL_CreateWindow: %s\n", SDL_GetError());
-        SDL_Quit();
         return false;
     }
 
@@ -94,14 +102,12 @@ bool Game::Initialize()
     if (!renderer)
     {
         SDL_Log("SDL_CreateRenderer: %s\n", SDL_GetError());
-        SDL_Quit();
         return false;
     }
 
     if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG)
     {
         printf("IMG_Init: failed to init required png support %s\n", IMG_GetError());
-        SDL_Quit();
         return false;
     }
 
@@ -109,14 +115,13 @@ bool Game::Initialize()
     if (!surface)
     {
          printf("IMG_Load: %s\n", IMG_GetError());
-         SDL_Quit();
          return false;
     }
     cursor = SDL_CreateTextureFromSurface(renderer, surface);
     if (!cursor)
     {
         printf("CreateTextureFromSurface failed: %s\n", SDL_GetError());
-        SDL_Quit();
+        SDL_FreeSurface(surface);
         return false;
     }
     SDL_FreeSurface(surface);
@@ -126,8 +131,7 @@ bool Game::Initialize()
         if (SDL_JoystickOpen(i) == NULL)
         {
             SDL_Log("SDL_JoystickOpen: %s\n", SDL_GetError());
-            SDL_Quit();
-            return -1;
+            return false;
         }
     }
 
@@ -141,13 +145,16 @@ bool Game::Initialize()
     return true;
 }
 
-void Game::New()
+void Game::New(time_t seeded_game)
 {
-    srand(time(NULL));
+    if (seeded_game == 0)
+        seeded_game = time(NULL);
+
+    srand(seed = seeded_game);
 
     colors.clear();
     for (int i = 0; i < 4; i++)
-        colors.push_back({rand() % 255, rand() % 255, rand() % 255});
+        colors.push_back({randomInt(48, 255 - 28), randomInt(48, 255 - 28), randomInt(48, 255 - 28)});
 
     puzzle.reset(new Puzzle(16, 8, 4));
 
@@ -291,6 +298,10 @@ void Game::OnButtonDown(const SDL_JoyButtonEvent& event)
         case SDL_KEY_A:
         case SDL_KEY_B:
             DoMatch(current_tile.first, current_tile.second);
+            break;
+        case SDL_KEY_X:
+            New(seed);
+            break;
         default:
             break;
     }
@@ -300,7 +311,6 @@ void Game::OnButtonUp(const SDL_JoyButtonEvent& event)
 {
 
 }
-
 
 void Game::Draw()
 {
@@ -312,7 +322,6 @@ void Game::Draw()
         for (uint32_t x = 0; x < puzzle->width; x++)
         {
             uint8_t c = puzzle->at(x, y);
-
             if (c == Puzzle::EMPTY) continue;
 
             auto [r, g, b] = colors[c];
@@ -322,7 +331,7 @@ void Game::Draw()
             else
                 SDL_SetRenderDrawColor(renderer, r, g, b, 255);
 
-            SDL_Rect rect = {static_cast<int>(x) * 120, static_cast<int>(y) * 120, 120, 120};
+            SDL_Rect rect = {static_cast<int>(x) * 120 + 1, static_cast<int>(y) * 120 + 1, 118, 118};
             SDL_RenderFillRect(renderer, &rect);
         }
     }
@@ -339,9 +348,9 @@ void Game::Draw()
 void Game::Destroy()
 {
     romfsExit();
-    SDL_DestroyTexture(cursor);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
+    if (cursor) SDL_DestroyTexture(cursor);
+    if (renderer) SDL_DestroyRenderer(renderer);
+    if (window) SDL_DestroyWindow(window);
     IMG_Quit();
     SDL_Quit();
 
@@ -350,15 +359,14 @@ void Game::Destroy()
 
 void Game::DoSelectSet(uint32_t tile_x, uint32_t tile_y)
 {
-    if (puzzle->at(tile_x, tile_y) == Puzzle::EMPTY)
-        return;
-
     if (tile_x == -1U || tile_y == -1U)
     {
-        current_tile = {-1, -1};
         points.clear();
         return;
     }
+
+    if (puzzle->at(tile_x, tile_y) == Puzzle::EMPTY)
+        return;
 
     current_tile = {tile_x, tile_y};
     if (points.find({tile_x, tile_y}) == points.end())
@@ -377,15 +385,14 @@ void Game::DoSelectSet(uint32_t tile_x, uint32_t tile_y)
 
 void Game::DoMatch(uint32_t tile_x, uint32_t tile_y)
 {
-    if (puzzle->at(tile_x, tile_y) == Puzzle::EMPTY)
-        return;
-
     if (tile_x == -1U || tile_y == -1U)
     {
-        current_tile = {-1, -1};
         points.clear();
         return;
     }
+
+    if (puzzle->at(tile_x, tile_y) == Puzzle::EMPTY)
+        return;
 
     if (points.find({tile_x, tile_y}) == points.end() && input_mode == TOUCH)
     {
@@ -397,17 +404,13 @@ void Game::DoMatch(uint32_t tile_x, uint32_t tile_y)
     score += matches * matches;
 
     points.clear();
-    if (input_mode == TOUCH)
-        current_tile = {-1, -1};
 }
 
 int main(int argc, char *argv[])
 {
     Game game;
-    if (!game.Initialize())
-        return 0;
-
-    game.Run();
+    if (game.Initialize())
+        game.Run();
     game.Destroy();
     return 0;
 }
