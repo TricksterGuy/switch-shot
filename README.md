@@ -4,7 +4,7 @@ Same Game (Chain Shot!) clone for the Nintendo Switch
 This game is a work in progress!
 
 ## Roadmap
-Ehh, this is just small project to get my hands rewettened with SDL, as I have used the now abandoned RubyGame binding for SDL some 12-13 years ago. And to get back into good old Nintendo homebrew!
+Ehh, this is just small project to get my hands rewettened with SDL, as I have used the (now abandoned) RubyGame binding for SDL some 12-13 years ago. And to get back into good old Nintendo homebrew!
 
 Maybe I'll get ambitious and toss in some more features, and UI considering the following:
 * Difficulty settings. (Ensuring every game has a solution).
