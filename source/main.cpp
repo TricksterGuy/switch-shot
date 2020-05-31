@@ -5,6 +5,7 @@
 
 #include <switch.h>
 #include <SDL.h>
+#include <SDL_image.h>
 #include "NFont.h"
 #include "SDL_FontCache.h"
 
@@ -31,6 +32,12 @@ enum SDLKeyMapping {
         SDL_KEY_SL_LEFT, SDL_KEY_SR_LEFT, SDL_KEY_SL_RIGHT, SDL_KEY_SR_RIGHT
 };
 
+enum InputMode
+{
+    TOUCH,
+    BUTTON,
+};
+
 class Game
 {
 public:
@@ -49,18 +56,20 @@ private:
     void OnButtonUp(const SDL_JoyButtonEvent& event);
 
     std::pair<uint32_t, uint32_t> GetCoords(float x, float y) const;
+    void DoMatch(uint32_t tile_x, uint32_t tile_y);
     void DoSelectSet(uint32_t tile_x, uint32_t tile_y);
 
     SDL_Window* window;
     SDL_Renderer* renderer;
+    SDL_Texture* cursor;
     std::unique_ptr<NFont> font;
     std::unique_ptr<Puzzle> puzzle;
     uint32_t score;
     std::vector<std::tuple<uint8_t, uint8_t, uint8_t>> colors;
     std::pair<uint32_t, uint32_t> current_tile;
-    uint8_t current_color;
     Puzzle::point_set points;
     ColorModulation modulation;
+    int input_mode = TOUCH;
 };
 
 bool Game::Initialize()
@@ -88,6 +97,29 @@ bool Game::Initialize()
         SDL_Quit();
         return false;
     }
+
+    if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG)
+    {
+        printf("IMG_Init: failed to init required png support %s\n", IMG_GetError());
+        SDL_Quit();
+        return false;
+    }
+
+    SDL_Surface* surface = IMG_Load("romfs:/graphics/cursor.png");
+    if (!surface)
+    {
+         printf("IMG_Load: %s\n", IMG_GetError());
+         SDL_Quit();
+         return false;
+    }
+    cursor = SDL_CreateTextureFromSurface(renderer, surface);
+    if (!cursor)
+    {
+        printf("CreateTextureFromSurface failed: %s\n", SDL_GetError());
+        SDL_Quit();
+        return false;
+    }
+    SDL_FreeSurface(surface);
 
     for (int i = 0; i < 2; i++)
     {
@@ -119,8 +151,7 @@ void Game::New()
 
     puzzle.reset(new Puzzle(16, 8, 4));
 
-    current_tile = {-1, -1};
-    current_color = Puzzle::EMPTY;
+    current_tile = {8, 4};
 
     score = 0;
 }
@@ -204,36 +235,65 @@ std::pair<uint32_t, uint32_t> Game::GetCoords(float x, float y) const
 
 void Game::OnTouchDown(const SDL_TouchFingerEvent& event)
 {
+    input_mode = TOUCH;
     auto [tile_x, tile_y] = GetCoords(event.x, event.y);
-
-    if (points.find({tile_x, tile_y}) == points.end())
-    {
-        DoSelectSet(tile_x, tile_y);
-        return;
-    }
-
-    uint32_t matches = puzzle->match(tile_x, tile_y) - 1;
-    score += matches * matches;
-
-    points.clear();
-    current_tile = {-1, -1};
+    DoMatch(tile_x, tile_y);
 }
 
 void Game::OnTouchUp(const SDL_TouchFingerEvent& event)
 {
-
+    input_mode = TOUCH;
 }
 
 void Game::OnTouchMotion(const SDL_TouchFingerEvent& event)
 {
+    input_mode = TOUCH;
     auto [tile_x, tile_y] = GetCoords(event.x, event.y);
     DoSelectSet(tile_x, tile_y);
 }
 
 void Game::OnButtonDown(const SDL_JoyButtonEvent& event)
 {
-    if (event.button == SDL_KEY_MINUS)
-        New();
+
+    switch (event.button)
+    {
+        case SDL_KEY_MINUS:
+            New();
+            break;
+        case SDL_KEY_DRIGHT:
+        case SDL_KEY_LSTICK_RIGHT:
+        case SDL_KEY_RSTICK_RIGHT:
+            input_mode = BUTTON;
+            current_tile.first = std::min(current_tile.first + 1, puzzle->width - 1);
+            DoSelectSet(current_tile.first, current_tile.second);
+            break;
+        case SDL_KEY_DLEFT:
+        case SDL_KEY_LSTICK_LEFT:
+        case SDL_KEY_RSTICK_LEFT:
+            input_mode = BUTTON;
+            current_tile.first = std::max(current_tile.first - 1, 0U);
+            DoSelectSet(current_tile.first, current_tile.second);
+            break;
+        case SDL_KEY_DDOWN:
+        case SDL_KEY_LSTICK_DOWN:
+        case SDL_KEY_RSTICK_DOWN:
+            input_mode = BUTTON;
+            current_tile.second = std::min(current_tile.second + 1, puzzle->height - 1);
+            DoSelectSet(current_tile.first, current_tile.second);
+            break;
+        case SDL_KEY_DUP:
+        case SDL_KEY_LSTICK_UP:
+        case SDL_KEY_RSTICK_UP:
+            input_mode = BUTTON;
+            current_tile.second = std::max(current_tile.second - 1, 0U);
+            DoSelectSet(current_tile.first, current_tile.second);
+            break;
+        case SDL_KEY_A:
+        case SDL_KEY_B:
+            DoMatch(current_tile.first, current_tile.second);
+        default:
+            break;
+    }
 }
 
 void Game::OnButtonUp(const SDL_JoyButtonEvent& event)
@@ -266,14 +326,23 @@ void Game::Draw()
             SDL_RenderFillRect(renderer, &rect);
         }
     }
+
+    if (current_tile != std::make_pair(-1U, -1U))
+    {
+        SDL_Rect rect = {static_cast<int>(current_tile.first) * 120, static_cast<int>(current_tile.second) * 120, 120, 120};
+        SDL_RenderCopy(renderer, cursor, nullptr, &rect);
+    }
+
     font->draw(renderer, 0, 8 * 120, NFont::Color(128, 128, 255), "Score: %d", score);
 }
 
 void Game::Destroy()
 {
     romfsExit();
+    SDL_DestroyTexture(cursor);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    IMG_Quit();
     SDL_Quit();
 
     /*consoleExit(NULL); */
@@ -281,13 +350,22 @@ void Game::Destroy()
 
 void Game::DoSelectSet(uint32_t tile_x, uint32_t tile_y)
 {
-    if (tile_x == -1 || tile_y == -1)
+    if (puzzle->at(tile_x, tile_y) == Puzzle::EMPTY)
         return;
 
+    if (tile_x == -1U || tile_y == -1U)
+    {
+        current_tile = {-1, -1};
+        points.clear();
+        return;
+    }
+
+    current_tile = {tile_x, tile_y};
     if (points.find({tile_x, tile_y}) == points.end())
     {
         points = puzzle->test(tile_x, tile_y);
-        current_color = puzzle->at(tile_x, tile_y);
+        uint8_t current_color = puzzle->at(tile_x, tile_y);
+        current_tile = {tile_x, tile_y};
         if (current_color != Puzzle::EMPTY)
         {
             auto [r, g, b] = colors[current_color];
@@ -297,10 +375,38 @@ void Game::DoSelectSet(uint32_t tile_x, uint32_t tile_y)
     }
 }
 
+void Game::DoMatch(uint32_t tile_x, uint32_t tile_y)
+{
+    if (puzzle->at(tile_x, tile_y) == Puzzle::EMPTY)
+        return;
+
+    if (tile_x == -1U || tile_y == -1U)
+    {
+        current_tile = {-1, -1};
+        points.clear();
+        return;
+    }
+
+    if (points.find({tile_x, tile_y}) == points.end() && input_mode == TOUCH)
+    {
+        DoSelectSet(tile_x, tile_y);
+        return;
+    }
+
+    uint32_t matches = puzzle->match(tile_x, tile_y) - 1;
+    score += matches * matches;
+
+    points.clear();
+    if (input_mode == TOUCH)
+        current_tile = {-1, -1};
+}
+
 int main(int argc, char *argv[])
 {
     Game game;
-    game.Initialize();
+    if (!game.Initialize())
+        return 0;
+
     game.Run();
     game.Destroy();
     return 0;

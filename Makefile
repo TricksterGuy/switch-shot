@@ -62,7 +62,7 @@ CFLAGS   +=	$(INCLUDE) -D__SWITCH__ -I$(DEVKITPRO)/portlibs/switch/include/SDL2 
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions -std=c++17
 ASFLAGS  := $(ARCH)
 LDFLAGS  = -specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) -Wl,-Map,$(notdir $*.map)
-LIBS     := -L$(DEVKITPRO)/portlibs/switch/lib -lSDL2_ttf -lSDL2 -lfreetype -lpng -lz -lbz2 -march=armv8-a -fPIE -L$(DEVKITPRO)/libnx/lib -lglad -lEGL -lGLESv2 -lglapi -ldrm_nouveau -lnx
+LIBS     := -L$(DEVKITPRO)/portlibs/switch/lib -lSDL2_ttf -lSDL2_image -lSDL2 -lfreetype -lpng -ljpeg -lwebp -lz -lbz2 -march=armv8-a -fPIE -L$(DEVKITPRO)/libnx/lib -lglad -lEGL -lGLESv2 -lglapi -ldrm_nouveau -lnx
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
