@@ -154,7 +154,7 @@ void Game::New(time_t seeded_game)
 
     colors.clear();
     for (int i = 0; i < 4; i++)
-        colors.push_back({randomInt(48, 255 - 28), randomInt(48, 255 - 28), randomInt(48, 255 - 28)});
+        colors.push_back({randomInt(48, 255 - 48), randomInt(48, 255 - 48), randomInt(48, 255 - 48)});
 
     puzzle.reset(new Puzzle(16, 8, 4));
 
