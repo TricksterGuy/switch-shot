@@ -11,6 +11,14 @@
 #include "puzzle.hpp"
 #include "color_modulation.hpp"
 
+
+constexpr uint32_t SCREEN_WIDTH = 1920;
+constexpr uint32_t SCREEN_HEIGHT = 1080;
+
+constexpr uint32_t GAME_WIDTH = SCREEN_WIDTH;
+constexpr uint32_t GAME_HEIGHT = SCREEN_HEIGHT - 120;
+
+
 class Game
 {
 public:
@@ -27,6 +35,9 @@ private:
     void OnTouchUp(const SDL_TouchFingerEvent& event);
     void OnButtonDown(const SDL_JoyButtonEvent& event);
     void OnButtonUp(const SDL_JoyButtonEvent& event);
+
+    std::pair<uint32_t, uint32_t> GetCoords(float x, float y) const;
+    void DoSelectSet(uint32_t tile_x, uint32_t tile_y);
 
     SDL_Window* window;
     SDL_Renderer* renderer;
@@ -50,7 +61,7 @@ bool Game::Initialize()
         return false;
     }
 
-    window = SDL_CreateWindow("??????", 0, 0, 1920, 1080, 0);
+    window = SDL_CreateWindow("SwitchShot!", 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     if (!window)
     {
         SDL_Log("SDL_CreateWindow: %s\n", SDL_GetError());
@@ -141,53 +152,51 @@ bool Game::Input()
     {
         switch (event.type)
         {
-        case SDL_FINGERMOTION:
-            OnTouchMotion(event.tfinger);
-            break;
-        case SDL_FINGERDOWN:
-            OnTouchDown(event.tfinger);
-            break;
-        case SDL_FINGERUP:
-            OnTouchUp(event.tfinger);
-            break;
-        case SDL_JOYAXISMOTION:
-            SDL_Log("Joystick %d axis %d value: %d\n",
-                    event.jaxis.which,
-                    event.jaxis.axis, event.jaxis.value);
-            break;
-        case SDL_JOYBUTTONDOWN:
-            // https://github.com/devkitPro/SDL/blob/switch-sdl2/src/joystick/switch/SDL_sysjoystick.c#L52
-            // seek for joystick #0
-            if (event.jbutton.which == 0)
-            {
-                OnButtonDown(event.jbutton);
+            case SDL_FINGERMOTION:
+                OnTouchMotion(event.tfinger);
+                break;
+            case SDL_FINGERDOWN:
+                OnTouchDown(event.tfinger);
+                break;
+            case SDL_FINGERUP:
+                OnTouchUp(event.tfinger);
+                break;
+            case SDL_JOYBUTTONDOWN:
+                if (event.jbutton.which == 0)
+                {
+                    OnButtonDown(event.jbutton);
 
-                if (event.jbutton.button == KEY_PLUS)
-                    return false;
-            }
-            break;
+                    if (event.jbutton.button == KEY_PLUS)
+                        return false;
+                }
+                break;
 
-        default:
-            break;
+            default:
+                break;
         }
     }
     return true;
 }
 
+std::pair<uint32_t, uint32_t> Game::GetCoords(float x, float y) const
+{
+    uint32_t sx = static_cast<uint32_t>(x * SCREEN_WIDTH);
+    uint32_t sy = static_cast<uint32_t>(y * SCREEN_HEIGHT);
+
+    if (sx > GAME_WIDTH || sy > GAME_HEIGHT)
+        return {-1, -1};
+
+    return {std::max(std::min(sx / 120, puzzle->width - 1), 0U),
+            std::max(std::min(sy / 120, puzzle->height - 1), 0U)};
+}
+
 void Game::OnTouchDown(const SDL_TouchFingerEvent& event)
 {
-    uint32_t x = static_cast<uint32_t>(event.x * 1920);
-    uint32_t y = static_cast<uint32_t>(event.y * 1080);
-
-    if (y > 8 * 120) return;
-
-    uint32_t tile_x, tile_y;
-    tile_x = std::max(std::min(x / 120, puzzle->width - 1), 0U);
-    tile_y = std::max(std::min(y / 120, puzzle->height - 1), 0U);
+    auto [tile_x, tile_y] = GetCoords(event.x, event.y);
 
     if (points.find({tile_x, tile_y}) == points.end())
     {
-        OnTouchMotion(event);
+        DoSelectSet(tile_x, tile_y);
         return;
     }
 
@@ -205,26 +214,8 @@ void Game::OnTouchUp(const SDL_TouchFingerEvent& event)
 
 void Game::OnTouchMotion(const SDL_TouchFingerEvent& event)
 {
-    uint32_t x = static_cast<uint32_t>(event.x * 1920);
-    uint32_t y = static_cast<uint32_t>(event.y * 1080);
-
-    if (y > 8 * 120) return;
-
-    uint32_t tile_x, tile_y;
-    tile_x = std::max(std::min(x / 120, puzzle->width - 1), 0U);
-    tile_y = std::max(std::min(y / 120, puzzle->height - 1), 0U);
-
-    if (current_tile != std::make_pair(tile_x, tile_y) && points.find({tile_x, tile_y}) == points.end())
-    {
-        points = puzzle->test(tile_x, tile_y);
-        current_color = puzzle->at(tile_x, tile_y);
-        if (current_color != Puzzle::EMPTY)
-        {
-            auto [r, g, b] = colors[current_color];
-            modulation.set(RGBA8_MAXALPHA(std::max(0,   r - 48), std::max(0,   g - 48), std::max(0,   b - 48)),
-                           RGBA8_MAXALPHA(std::min(255, r + 48), std::min(255, g + 48), std::min(255, b + 48)), 60);
-        }
-    }
+    auto [tile_x, tile_y] = GetCoords(event.x, event.y);
+    DoSelectSet(tile_x, tile_y);
 }
 
 void Game::OnButtonDown(const SDL_JoyButtonEvent& event)
@@ -274,6 +265,24 @@ void Game::Destroy()
     SDL_Quit();
 
     /*consoleExit(NULL); */
+}
+
+void Game::DoSelectSet(uint32_t tile_x, uint32_t tile_y)
+{
+    if (tile_x == -1 || tile_y == -1)
+        return;
+
+    if (points.find({tile_x, tile_y}) == points.end())
+    {
+        points = puzzle->test(tile_x, tile_y);
+        current_color = puzzle->at(tile_x, tile_y);
+        if (current_color != Puzzle::EMPTY)
+        {
+            auto [r, g, b] = colors[current_color];
+            modulation.set(RGBA8_MAXALPHA(std::max(0,   r - 48), std::max(0,   g - 48), std::max(0,   b - 48)),
+                           RGBA8_MAXALPHA(std::min(255, r + 48), std::min(255, g + 48), std::min(255, b + 48)), 60);
+        }
+    }
 }
 
 int main(int argc, char *argv[])
