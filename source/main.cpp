@@ -19,6 +19,18 @@ constexpr uint32_t GAME_WIDTH = SCREEN_WIDTH;
 constexpr uint32_t GAME_HEIGHT = SCREEN_HEIGHT - 120;
 
 
+enum SDLKeyMapping {
+        SDL_KEY_A, SDL_KEY_B, SDL_KEY_X, SDL_KEY_Y,
+        SDL_KEY_LSTICK, SDL_KEY_RSTICK,
+        SDL_KEY_L, SDL_KEY_R,
+        SDL_KEY_ZL, SDL_KEY_ZR,
+        SDL_KEY_PLUS, SDL_KEY_MINUS,
+        SDL_KEY_DLEFT, SDL_KEY_DUP, SDL_KEY_DRIGHT, SDL_KEY_DDOWN,
+        SDL_KEY_LSTICK_LEFT, SDL_KEY_LSTICK_UP, SDL_KEY_LSTICK_RIGHT, SDL_KEY_LSTICK_DOWN,
+        SDL_KEY_RSTICK_LEFT, SDL_KEY_RSTICK_UP, SDL_KEY_RSTICK_RIGHT, SDL_KEY_RSTICK_DOWN,
+        SDL_KEY_SL_LEFT, SDL_KEY_SR_LEFT, SDL_KEY_SL_RIGHT, SDL_KEY_SR_RIGHT
+};
+
 class Game
 {
 public:
@@ -145,7 +157,7 @@ bool Game::Input()
 
     // hidKeysDown returns information about which buttons have been just pressed (and they weren't in the previous frame)
     u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
-    if (kDown & KEY_PLUS) return false; // break in order to return to hbmenu*/
+    if (kDown & SDL_KEY_PLUS) return false; // break in order to return to hbmenu*/
 
     SDL_Event event;
     while (SDL_PollEvent(&event))
@@ -166,7 +178,7 @@ bool Game::Input()
                 {
                     OnButtonDown(event.jbutton);
 
-                    if (event.jbutton.button == KEY_PLUS)
+                    if (event.jbutton.button == SDL_KEY_PLUS)
                         return false;
                 }
                 break;
@@ -220,7 +232,7 @@ void Game::OnTouchMotion(const SDL_TouchFingerEvent& event)
 
 void Game::OnButtonDown(const SDL_JoyButtonEvent& event)
 {
-    if (event.button == KEY_MINUS)
+    if (event.button == SDL_KEY_MINUS)
         New();
 }
 
