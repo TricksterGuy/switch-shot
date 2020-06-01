@@ -1,6 +1,3 @@
-#include <cstdlib>
-#include <cstdio>
-#include <ctime>
 #include <memory>
 
 #include <switch.h>
@@ -86,7 +83,7 @@ void SwitchShot::New(time_t seeded_game)
 
     puzzle.reset(new Puzzle(16, 8, 4));
 
-    current_tile = {8, 4};
+    current_tile = {puzzle->width / 2, puzzle->height / 2};
 
     score = 0;
 }
