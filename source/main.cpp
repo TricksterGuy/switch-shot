@@ -394,7 +394,7 @@ void Game::DoMatch(uint32_t tile_x, uint32_t tile_y)
     if (puzzle->at(tile_x, tile_y) == Puzzle::EMPTY)
         return;
 
-    if (points.find({tile_x, tile_y}) == points.end() && input_mode == TOUCH)
+    if (points.find({tile_x, tile_y}) == points.end())
     {
         DoSelectSet(tile_x, tile_y);
         return;
