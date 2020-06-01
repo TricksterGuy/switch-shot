@@ -4,112 +4,54 @@
 #include <memory>
 
 #include <switch.h>
-#include <SDL.h>
-#include <SDL_image.h>
+#include "SDLGame.hpp"
 #include "NFont.h"
 #include "SDL_FontCache.h"
 
 #include "puzzle.hpp"
 #include "color_modulation.hpp"
 
-constexpr uint32_t SCREEN_WIDTH = 1920;
-constexpr uint32_t SCREEN_HEIGHT = 1080;
-
 constexpr uint32_t GAME_WIDTH = SCREEN_WIDTH;
 constexpr uint32_t GAME_HEIGHT = SCREEN_HEIGHT - 120;
 
-inline int randomInt(int max)
+class SwitchShot : public SDLGame
 {
-    return rand() / (RAND_MAX / max + 1);
-}
+public:
+    SwitchShot() : SDLGame("SwitchShot!") {}
 
-inline int randomInt(int start, int end)
-{
-    return randomInt(end - start + 1) + start;
-}
+    bool Initialize() override;
+    void New(time_t seeded_game = 0) override;
+    void Update() override;
+    void Draw() override;
+    void Destroy() override;
 
-enum SDLKeyMapping {
-        SDL_KEY_A, SDL_KEY_B, SDL_KEY_X, SDL_KEY_Y,
-        SDL_KEY_LSTICK, SDL_KEY_RSTICK,
-        SDL_KEY_L, SDL_KEY_R,
-        SDL_KEY_ZL, SDL_KEY_ZR,
-        SDL_KEY_PLUS, SDL_KEY_MINUS,
-        SDL_KEY_DLEFT, SDL_KEY_DUP, SDL_KEY_DRIGHT, SDL_KEY_DDOWN,
-        SDL_KEY_LSTICK_LEFT, SDL_KEY_LSTICK_UP, SDL_KEY_LSTICK_RIGHT, SDL_KEY_LSTICK_DOWN,
-        SDL_KEY_RSTICK_LEFT, SDL_KEY_RSTICK_UP, SDL_KEY_RSTICK_RIGHT, SDL_KEY_RSTICK_DOWN,
-        SDL_KEY_SL_LEFT, SDL_KEY_SR_LEFT, SDL_KEY_SL_RIGHT, SDL_KEY_SR_RIGHT
+private:
+    void OnTouchMotion(const SDL_TouchFingerEvent& event) override;
+    void OnTouchDown(const SDL_TouchFingerEvent& event) override;
+    void OnButtonDown(const SDL_JoyButtonEvent& event) override;
+
+    std::pair<uint32_t, uint32_t> GetCoords(float x, float y) const;
+    void DoMatch(uint32_t tile_x, uint32_t tile_y);
+    void DoSelectSet(uint32_t tile_x, uint32_t tile_y);
+
+    SDL_Texture* cursor = nullptr;
+    std::unique_ptr<NFont> font;
+
+    std::unique_ptr<Puzzle> puzzle;
+    uint32_t score;
+
+    std::vector<std::tuple<uint8_t, uint8_t, uint8_t>> colors;
+    std::pair<uint32_t, uint32_t> current_tile;
+    Puzzle::point_set points;
+    ColorModulation modulation;
 };
 
-enum InputMode
+bool SwitchShot::Initialize()
 {
-    TOUCH,
-    BUTTON,
-};
+    if (!SDLGame::Initialize())
+        return false;
 
-class Game
-{
-    public:
-        bool Initialize();
-        void New(time_t seeded_game = 0);
-        void Run();
-        bool Update();
-        bool Input();
-        void Draw();
-        void Destroy();
-    private:
-        void OnTouchMotion(const SDL_TouchFingerEvent& event);
-        void OnTouchDown(const SDL_TouchFingerEvent& event);
-        void OnTouchUp(const SDL_TouchFingerEvent& event);
-        void OnButtonDown(const SDL_JoyButtonEvent& event);
-        void OnButtonUp(const SDL_JoyButtonEvent& event);
-
-        std::pair<uint32_t, uint32_t> GetCoords(float x, float y) const;
-        void DoMatch(uint32_t tile_x, uint32_t tile_y);
-        void DoSelectSet(uint32_t tile_x, uint32_t tile_y);
-
-        SDL_Window* window = nullptr;
-        SDL_Renderer* renderer = nullptr;
-        SDL_Texture* cursor = nullptr;
-        std::unique_ptr<NFont> font;
-        std::unique_ptr<Puzzle> puzzle;
-        uint32_t score;
-        std::vector<std::tuple<uint8_t, uint8_t, uint8_t>> colors;
-        std::pair<uint32_t, uint32_t> current_tile;
-        Puzzle::point_set points;
-        ColorModulation modulation;
-        int input_mode = TOUCH;
-        time_t seed;
-};
-
-bool Game::Initialize()
-{
     romfsInit();
-
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0)
-    {
-        SDL_Log("SDL_Init: %s\n", SDL_GetError());
-        return false;
-    }
-
-    window = SDL_CreateWindow("SwitchShot!", 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
-    if (!window)
-    {
-        SDL_Log("SDL_CreateWindow: %s\n", SDL_GetError());
-        return false;
-    }
-
-    renderer = SDL_CreateRenderer(window, 0, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (!renderer)
-    {
-        SDL_Log("SDL_CreateRenderer: %s\n", SDL_GetError());
-        return false;
-    }
-
-    if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG)
-    {
-        printf("IMG_Init: failed to init required png support %s\n", IMG_GetError());
-        return false;
-    }
 
     SDL_Surface* surface = IMG_Load("romfs:/graphics/cursor.png");
     if (!surface)
@@ -117,6 +59,7 @@ bool Game::Initialize()
          printf("IMG_Load: %s\n", IMG_GetError());
          return false;
     }
+
     cursor = SDL_CreateTextureFromSurface(renderer, surface);
     if (!cursor)
     {
@@ -126,18 +69,6 @@ bool Game::Initialize()
     }
     SDL_FreeSurface(surface);
 
-    for (int i = 0; i < 2; i++)
-    {
-        if (SDL_JoystickOpen(i) == NULL)
-        {
-            SDL_Log("SDL_JoystickOpen: %s\n", SDL_GetError());
-            return false;
-        }
-    }
-
-    // Initialize console. Using NULL as the second argument tells the console library to use the internal console structure as current one.
-    //consoleInit(NULL);
-
     font.reset(new NFont(renderer, "romfs:/fonts/FreeSans.ttf", 60));
 
     New();
@@ -145,12 +76,9 @@ bool Game::Initialize()
     return true;
 }
 
-void Game::New(time_t seeded_game)
+void SwitchShot::New(time_t seeded_game)
 {
-    if (seeded_game == 0)
-        seeded_game = time(NULL);
-
-    srand(seed = seeded_game);
+    SDLGame::New(seeded_game);
 
     colors.clear();
     for (int i = 0; i < 4; i++)
@@ -163,160 +91,13 @@ void Game::New(time_t seeded_game)
     score = 0;
 }
 
-void Game::Run()
+void SwitchShot::Update()
 {
-    bool running = true;
-    do
-    {
-        running = Update();
-        SDL_RenderPresent(renderer);
-    }
-    while(running /*&& appletMainLoop()*/);
-}
-
-bool Game::Update()
-{
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
-
-    if (!Input()) return false;
-
     modulation.update();
-
-    Draw();
-
-    return true;
 }
 
-bool Game::Input()
+void SwitchShot::Draw()
 {
-    /*// Scan all the inputs. This should be done once for each frame
-    hidScanInput();
-
-    // hidKeysDown returns information about which buttons have been just pressed (and they weren't in the previous frame)
-    u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
-    if (kDown & SDL_KEY_PLUS) return false; // break in order to return to hbmenu*/
-
-    SDL_Event event;
-    while (SDL_PollEvent(&event))
-    {
-        switch (event.type)
-        {
-            case SDL_FINGERMOTION:
-                OnTouchMotion(event.tfinger);
-                break;
-            case SDL_FINGERDOWN:
-                OnTouchDown(event.tfinger);
-                break;
-            case SDL_FINGERUP:
-                OnTouchUp(event.tfinger);
-                break;
-            case SDL_JOYBUTTONDOWN:
-                if (event.jbutton.which == 0)
-                {
-                    OnButtonDown(event.jbutton);
-
-                    if (event.jbutton.button == SDL_KEY_PLUS)
-                        return false;
-                }
-                break;
-
-            default:
-                break;
-        }
-    }
-    return true;
-}
-
-std::pair<uint32_t, uint32_t> Game::GetCoords(float x, float y) const
-{
-    uint32_t sx = static_cast<uint32_t>(x * SCREEN_WIDTH);
-    uint32_t sy = static_cast<uint32_t>(y * SCREEN_HEIGHT);
-
-    if (sx > GAME_WIDTH || sy > GAME_HEIGHT)
-        return {-1, -1};
-
-    return {std::max(std::min(sx / 120, puzzle->width - 1), 0U),
-            std::max(std::min(sy / 120, puzzle->height - 1), 0U)};
-}
-
-void Game::OnTouchDown(const SDL_TouchFingerEvent& event)
-{
-    input_mode = TOUCH;
-    auto [tile_x, tile_y] = GetCoords(event.x, event.y);
-    DoMatch(tile_x, tile_y);
-}
-
-void Game::OnTouchUp(const SDL_TouchFingerEvent& event)
-{
-    input_mode = TOUCH;
-}
-
-void Game::OnTouchMotion(const SDL_TouchFingerEvent& event)
-{
-    input_mode = TOUCH;
-    auto [tile_x, tile_y] = GetCoords(event.x, event.y);
-    DoSelectSet(tile_x, tile_y);
-}
-
-void Game::OnButtonDown(const SDL_JoyButtonEvent& event)
-{
-
-    switch (event.button)
-    {
-        case SDL_KEY_MINUS:
-            New();
-            break;
-        case SDL_KEY_DRIGHT:
-        case SDL_KEY_LSTICK_RIGHT:
-        case SDL_KEY_RSTICK_RIGHT:
-            input_mode = BUTTON;
-            current_tile.first = std::min(current_tile.first + 1, puzzle->width - 1);
-            DoSelectSet(current_tile.first, current_tile.second);
-            break;
-        case SDL_KEY_DLEFT:
-        case SDL_KEY_LSTICK_LEFT:
-        case SDL_KEY_RSTICK_LEFT:
-            input_mode = BUTTON;
-            current_tile.first = std::max(current_tile.first - 1, 0U);
-            DoSelectSet(current_tile.first, current_tile.second);
-            break;
-        case SDL_KEY_DDOWN:
-        case SDL_KEY_LSTICK_DOWN:
-        case SDL_KEY_RSTICK_DOWN:
-            input_mode = BUTTON;
-            current_tile.second = std::min(current_tile.second + 1, puzzle->height - 1);
-            DoSelectSet(current_tile.first, current_tile.second);
-            break;
-        case SDL_KEY_DUP:
-        case SDL_KEY_LSTICK_UP:
-        case SDL_KEY_RSTICK_UP:
-            input_mode = BUTTON;
-            current_tile.second = std::max(current_tile.second - 1, 0U);
-            DoSelectSet(current_tile.first, current_tile.second);
-            break;
-        case SDL_KEY_A:
-        case SDL_KEY_B:
-            DoMatch(current_tile.first, current_tile.second);
-            break;
-        case SDL_KEY_X:
-            New(seed);
-            break;
-        default:
-            break;
-    }
-}
-
-void Game::OnButtonUp(const SDL_JoyButtonEvent& event)
-{
-
-}
-
-void Game::Draw()
-{
-    // Updates the screen.
-    //consoleUpdate(NULL);
-
     for (uint32_t y = 0; y < puzzle->height; y++)
     {
         for (uint32_t x = 0; x < puzzle->width; x++)
@@ -345,19 +126,82 @@ void Game::Draw()
     font->draw(renderer, 0, 8 * 120, NFont::Color(128, 128, 255), "Score: %d", score);
 }
 
-void Game::Destroy()
+void SwitchShot::Destroy()
 {
-    romfsExit();
     if (cursor) SDL_DestroyTexture(cursor);
-    if (renderer) SDL_DestroyRenderer(renderer);
-    if (window) SDL_DestroyWindow(window);
-    IMG_Quit();
-    SDL_Quit();
-
-    /*consoleExit(NULL); */
+    cursor = nullptr;
+    SDLGame::Destroy();
+    romfsExit();
 }
 
-void Game::DoSelectSet(uint32_t tile_x, uint32_t tile_y)
+std::pair<uint32_t, uint32_t> SwitchShot::GetCoords(float x, float y) const
+{
+    uint32_t sx = static_cast<uint32_t>(x * SCREEN_WIDTH);
+    uint32_t sy = static_cast<uint32_t>(y * SCREEN_HEIGHT);
+
+    if (sx > GAME_WIDTH || sy > GAME_HEIGHT)
+        return {-1, -1};
+
+    return {std::max(std::min(sx / 120, puzzle->width - 1), 0U),
+            std::max(std::min(sy / 120, puzzle->height - 1), 0U)};
+}
+
+void SwitchShot::OnTouchDown(const SDL_TouchFingerEvent& event)
+{
+    auto [tile_x, tile_y] = GetCoords(event.x, event.y);
+    DoMatch(tile_x, tile_y);
+}
+
+void SwitchShot::OnTouchMotion(const SDL_TouchFingerEvent& event)
+{
+    auto [tile_x, tile_y] = GetCoords(event.x, event.y);
+    DoSelectSet(tile_x, tile_y);
+}
+
+void SwitchShot::OnButtonDown(const SDL_JoyButtonEvent& event)
+{
+    switch (event.button)
+    {
+        case SDL_KEY_MINUS:
+            New();
+            break;
+        case SDL_KEY_DRIGHT:
+        case SDL_KEY_LSTICK_RIGHT:
+        case SDL_KEY_RSTICK_RIGHT:
+            current_tile.first = std::min(current_tile.first + 1, puzzle->width - 1);
+            DoSelectSet(current_tile.first, current_tile.second);
+            break;
+        case SDL_KEY_DLEFT:
+        case SDL_KEY_LSTICK_LEFT:
+        case SDL_KEY_RSTICK_LEFT:
+            current_tile.first = std::max(current_tile.first - 1, 0U);
+            DoSelectSet(current_tile.first, current_tile.second);
+            break;
+        case SDL_KEY_DDOWN:
+        case SDL_KEY_LSTICK_DOWN:
+        case SDL_KEY_RSTICK_DOWN:
+            current_tile.second = std::min(current_tile.second + 1, puzzle->height - 1);
+            DoSelectSet(current_tile.first, current_tile.second);
+            break;
+        case SDL_KEY_DUP:
+        case SDL_KEY_LSTICK_UP:
+        case SDL_KEY_RSTICK_UP:
+            current_tile.second = std::max(current_tile.second - 1, 0U);
+            DoSelectSet(current_tile.first, current_tile.second);
+            break;
+        case SDL_KEY_A:
+        case SDL_KEY_B:
+            DoMatch(current_tile.first, current_tile.second);
+            break;
+        case SDL_KEY_X:
+            New(seed);
+            break;
+        default:
+            break;
+    }
+}
+
+void SwitchShot::DoSelectSet(uint32_t tile_x, uint32_t tile_y)
 {
     if (tile_x == -1U || tile_y == -1U)
     {
@@ -383,7 +227,7 @@ void Game::DoSelectSet(uint32_t tile_x, uint32_t tile_y)
     }
 }
 
-void Game::DoMatch(uint32_t tile_x, uint32_t tile_y)
+void SwitchShot::DoMatch(uint32_t tile_x, uint32_t tile_y)
 {
     if (tile_x == -1U || tile_y == -1U)
     {
@@ -408,7 +252,7 @@ void Game::DoMatch(uint32_t tile_x, uint32_t tile_y)
 
 int main(int argc, char *argv[])
 {
-    Game game;
+    SwitchShot game;
     if (game.Initialize())
         game.Run();
     game.Destroy();
