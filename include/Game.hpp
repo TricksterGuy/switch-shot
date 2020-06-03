@@ -18,8 +18,8 @@ class Game
 {
 public:
     Game() {}
-    virtual ~Game() {Destroy();}
-    virtual bool Initialize();
+    virtual ~Game() {}
+    virtual bool Initialize() {return true;}
     virtual void New(time_t seeded_game = 0)
     {
         if (seeded_game == 0)

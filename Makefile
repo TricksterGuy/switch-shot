@@ -58,17 +58,17 @@ APP_TITLEID := E3BA0DD29CA7E000
 #---------------------------------------------------------------------------------
 ARCH     := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS   :=	-Wall -O2 -ffunction-sections $(ARCH) $(DEFINES)
-CFLAGS   +=	$(INCLUDE) -D__SWITCH__ -I$(DEVKITPRO)/portlibs/switch/include/SDL2 -D__SWITCH__ -march=armv8-a -mtune=cortex-a57 -mtp=soft -ftls-model=local-exec -isystem $(DEVKITPRO)/libnx/include -I$(DEVKITPRO)/portlibs/switch/include
+CFLAGS   +=	$(INCLUDE) -D__SWITCH__ -I$(DEVKITPRO)/portlibs/switch/include/SDL2 -D__SWITCH__ -march=armv8-a -mtune=cortex-a57 -mtp=soft -ftls-model=local-exec -isystem
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions -std=c++17
 ASFLAGS  := $(ARCH)
 LDFLAGS  = -specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) -Wl,-Map,$(notdir $*.map)
-LIBS     := -L$(DEVKITPRO)/portlibs/switch/lib -lSDL2_ttf -lSDL2_image -lSDL2 -lfreetype -lpng -ljpeg -lwebp -lz -lbz2 -march=armv8-a -fPIE -L$(DEVKITPRO)/libnx/lib -lglad -lEGL -lGLESv2 -lglapi -ldrm_nouveau -lnx
+LIBS     := -march=armv8-a -fPIE -lNfont -lSDL2_ttf -lSDL2_image -lSDL2 -lfreetype -lpng -ljpeg -lwebp -lz -lbz2 -lEGL -lglapi -ldrm_nouveau -lnx
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
-LIBDIRS	:= $(PORTLIBS) $(LIBNX)
+LIBDIRS	:= $(DEVKITPRO)/portlibs/switch $(LIBNX) $(TOPDIR)/portlibs
 
 #---------------------------------------------------------------------------------
 # no real need to edit anything past this point unless you need to add additional
