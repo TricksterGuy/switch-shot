@@ -95,17 +95,10 @@
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
 		<Unit filename="include/Game.hpp" />
-		<Unit filename="include/NFont.h" />
-		<Unit filename="include/NFont_gpu.h" />
 		<Unit filename="include/SDLGame.hpp" />
-		<Unit filename="include/SDL_FontCache.h" />
 		<Unit filename="include/color_modulation.hpp" />
 		<Unit filename="include/puzzle.hpp" />
-		<Unit filename="source/NFont.cpp" />
 		<Unit filename="source/SDLGame.cpp" />
-		<Unit filename="source/SDL_FontCache.c">
-			<Option compilerVar="CC" />
-		</Unit>
 		<Unit filename="source/color_modulation.cpp" />
 		<Unit filename="source/main.cpp">
 			<Option target="&lt;{~None~}&gt;" />
